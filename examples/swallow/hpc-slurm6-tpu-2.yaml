@@ -1,0 +1,78 @@
+# Copyright 2022 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+blueprint_name: slurm6-tpu-2
+
+vars:
+  project_id: swallow-llm
+  deployment_name: slurm6-tpu-2
+  region: us-central2
+  zone: us-central2-b
+  server_ip_homefs: 0.0.0.0
+  remote_mount_homefs: /nfsshare
+  local_mount_homefs: /home
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: network
+    source: modules/network/vpc
+
+  - id: tpu_nodeset
+    source: ./community/modules/compute/schedmd-slurm-gcp-v6-nodeset-tpu
+    use: [network]
+    settings:
+      node_type: v4-64
+      tf_version: 2.14.0
+      # Preemptible TPUs cost much less than non-preemptible TPUs.
+      # The Cloud TPU service might preempt (shut down) these TPUs at any time.
+      # https://cloud.google.com/tpu/docs/preemptible
+      preemptible: false
+      # Specify whether to preserve TPU on suspend.
+      # If set to true, suspended VM will be stopped.
+      # If set to false, suspended VM will be deleted.
+      preserve_tpu: false
+      node_count_static: 8
+      node_count_dynamic_max: 0
+
+  - id: homefs
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      server_ip: $(vars.server_ip_homefs)
+      remote_mount: $(vars.remote_mount_homefs)
+      local_mount: $(vars.local_mount_homefs)
+
+  - id: tpu_partition
+    source: ./community/modules/compute/schedmd-slurm-gcp-v6-partition
+    use: [tpu_nodeset]
+    settings:
+      partition_name: tpu
+
+  - id: slurm_login
+    source: ./community/modules/scheduler/schedmd-slurm-gcp-v6-login
+    use: [network]
+    settings:
+      machine_type: n2-standard-4
+      enable_login_public_ips: true
+
+  - id: slurm_controller
+    source: ./community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+    use:
+    - tpu_partition
+    - slurm_login
+    - network
+    settings:
+      enable_controller_public_ips: true
