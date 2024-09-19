@@ -21,19 +21,26 @@ vars:
   deployment_name: slurm6-tpu-2
   region: us-central2
   zone: us-central2-b
-  server_ip_homefs: 0.0.0.0
+  server_ip_homefs: 10.4.157.138
   remote_mount_homefs: /nfsshare
   local_mount_homefs: /home
+  network_name_system: slurm6-tpu-1-sysnet
+  subnetwork_name_system: slurm6-tpu-1-sysnet-subnet
 
 deployment_groups:
 - group: primary
   modules:
-  - id: network
-    source: modules/network/vpc
+  - id: sysnet
+    source: modules/network/pre-existing-vpc
+    settings:
+      network_name: $(vars.network_name_system)
+      subnetwork_name: $(vars.subnetwork_name_system)
 
   - id: tpu_nodeset
     source: ./community/modules/compute/schedmd-slurm-gcp-v6-nodeset-tpu
-    use: [network]
+    use:
+    - sysnet
+    - homefs
     settings:
       node_type: v4-64
       tf_version: 2.14.0
@@ -45,8 +52,8 @@ deployment_groups:
       # If set to true, suspended VM will be stopped.
       # If set to false, suspended VM will be deleted.
       preserve_tpu: false
-      node_count_static: 8
-      node_count_dynamic_max: 0
+      node_count_static: 0
+      node_count_dynamic_max: 8
 
   - id: homefs
     source: modules/file-system/pre-existing-network-storage
@@ -57,22 +64,27 @@ deployment_groups:
 
   - id: tpu_partition
     source: ./community/modules/compute/schedmd-slurm-gcp-v6-partition
-    use: [tpu_nodeset]
+    use:
+    - tpu_nodeset
     settings:
       partition_name: tpu
-
-  - id: slurm_login
-    source: ./community/modules/scheduler/schedmd-slurm-gcp-v6-login
-    use: [network]
-    settings:
-      machine_type: n2-standard-4
-      enable_login_public_ips: true
+      exclusive: false
 
   - id: slurm_controller
     source: ./community/modules/scheduler/schedmd-slurm-gcp-v6-controller
     use:
+    - sysnet
+    - homefs
     - tpu_partition
     - slurm_login
-    - network
     settings:
       enable_controller_public_ips: true
+      machine_type: n2-standard-4
+
+  - id: slurm_login
+    source: ./community/modules/scheduler/schedmd-slurm-gcp-v6-login
+    use:
+    - sysnet
+    settings:
+      machine_type: n2-standard-4
+      enable_login_public_ips: true
