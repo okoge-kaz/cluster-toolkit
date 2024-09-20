@@ -21,7 +21,7 @@ vars:
   deployment_name: slurm6-tpu-2
   region: us-central2
   zone: us-central2-b
-  server_ip_homefs: 10.4.157.138
+  server_ip_homefs: 10.40.77.218
   remote_mount_homefs: /nfsshare
   local_mount_homefs: /home
   network_name_system: slurm6-tpu-1-sysnet
