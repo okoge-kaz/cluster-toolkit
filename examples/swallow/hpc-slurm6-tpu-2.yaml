@@ -52,8 +52,9 @@ deployment_groups:
       # If set to true, suspended VM will be stopped.
       # If set to false, suspended VM will be deleted.
       preserve_tpu: false
-      node_count_static: 0
-      node_count_dynamic_max: 8
+      reserved: true
+      node_count_static: 8
+      node_count_dynamic_max: 0
 
   - id: homefs
     source: modules/file-system/pre-existing-network-storage
